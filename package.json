@@ -1,0 +1,20 @@
+{
+  "name": "codebase-complexity-visualizer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local-first macOS desktop app for codebase complexity analysis",
+  "packageManager": "pnpm@10.6.2",
+  "scripts": {
+    "build": "corepack pnpm -r build",
+    "typecheck": "corepack pnpm -r typecheck",
+    "test": "corepack pnpm -r test",
+    "check:code-tone": "node scripts/check-code-tone.mjs",
+    "clean": "corepack pnpm -r clean",
+    "analyze": "corepack pnpm --filter @ccv/analyzer analyze",
+    "dev:desktop": "corepack pnpm --filter @ccv/desktop dev",
+    "build:desktop": "corepack pnpm --filter @ccv/desktop build"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}
