@@ -1,0 +1,38 @@
+{
+  "name": "@ccv/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 1420",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "typecheck": "tsc --noEmit",
+    "test": "echo \"No desktop tests yet\"",
+    "clean": "rm -rf dist src-tauri/target"
+  },
+  "dependencies": {
+    "@ccv/model": "workspace:*",
+    "@tauri-apps/api": "^2.10.1",
+    "@tauri-apps/plugin-dialog": "^2.6.0",
+    "@tauri-apps/plugin-sql": "^2.3.2",
+    "cytoscape": "^3.30.4",
+    "d3": "^7.9.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "three": "^0.174.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.10.0",
+    "@types/d3": "^7.4.3",
+    "@types/node": "^22.10.5",
+    "@types/react": "^18.3.14",
+    "@types/react-dom": "^18.3.5",
+    "@types/three": "^0.174.0",
+    "@vitejs/plugin-react": "^4.4.1",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.5"
+  }
+}
