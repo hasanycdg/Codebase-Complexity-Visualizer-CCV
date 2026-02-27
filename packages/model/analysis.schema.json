@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ccv.dev/schema/analysis-1.0.0.json",
+  "title": "CCV Analysis Model",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "generatedAt",
+    "rootPath",
+    "config",
+    "summary",
+    "files",
+    "edges",
+    "scc"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "rootPath": {
+      "type": "string"
+    },
+    "config": {
+      "type": "object",
+      "required": ["languages", "exclude", "weights"],
+      "properties": {
+        "languages": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["js", "ts", "java", "py", "php", "css", "html"]
+          },
+          "uniqueItems": true
+        },
+        "exclude": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "weights": {
+          "type": "object",
+          "required": ["loc", "complexity", "fanIn", "fanOut", "cycle"],
+          "properties": {
+            "loc": { "type": "number" },
+            "complexity": { "type": "number" },
+            "fanIn": { "type": "number" },
+            "fanOut": { "type": "number" },
+            "cycle": { "type": "number" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "summary": {
+      "type": "object",
+      "required": ["fileCount", "dependencyCount", "cycleCount", "sccCount"],
+      "properties": {
+        "fileCount": { "type": "integer", "minimum": 0 },
+        "dependencyCount": { "type": "integer", "minimum": 0 },
+        "cycleCount": { "type": "integer", "minimum": 0 },
+        "sccCount": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "language",
+          "loc",
+          "complexity",
+          "fanIn",
+          "fanOut",
+          "inCycle",
+          "riskScore",
+          "imports"
+        ],
+        "properties": {
+          "path": { "type": "string" },
+          "language": {
+            "type": "string",
+            "enum": ["js", "ts", "java", "py", "php", "css", "html"]
+          },
+          "loc": { "type": "integer", "minimum": 0 },
+          "complexity": { "type": "integer", "minimum": 0 },
+          "fanIn": { "type": "integer", "minimum": 0 },
+          "fanOut": { "type": "integer", "minimum": 0 },
+          "inCycle": { "type": "boolean" },
+          "riskScore": { "type": "number" },
+          "imports": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["specifier", "resolvedPath", "external"],
+              "properties": {
+                "specifier": { "type": "string" },
+                "resolvedPath": {
+                  "anyOf": [{ "type": "string" }, { "type": "null" }]
+                },
+                "external": { "type": "boolean" }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["from", "to", "specifier", "external"],
+        "properties": {
+          "from": { "type": "string" },
+          "to": { "type": "string" },
+          "specifier": { "type": "string" },
+          "external": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "scc": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "size", "nodes"],
+        "properties": {
+          "id": { "type": "integer", "minimum": 1 },
+          "size": { "type": "integer", "minimum": 1 },
+          "nodes": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
