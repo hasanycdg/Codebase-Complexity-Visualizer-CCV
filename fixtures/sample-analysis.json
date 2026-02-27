@@ -1,0 +1,125 @@
+{
+  "schemaVersion": "1.0.0",
+  "generatedAt": "2026-02-24T14:03:41.323Z",
+  "rootPath": "/Users/hasanyucedag/Desktop/code-analyzer/codebase-complexity-visualizer/fixtures/sample-repo",
+  "config": {
+    "languages": [
+      "js",
+      "ts"
+    ],
+    "exclude": [
+      "node_modules",
+      ".git",
+      "dist",
+      "build"
+    ],
+    "weights": {
+      "loc": 0.8,
+      "complexity": 1.4,
+      "fanIn": 1,
+      "fanOut": 1,
+      "cycle": 2.5
+    }
+  },
+  "summary": {
+    "fileCount": 3,
+    "dependencyCount": 3,
+    "cycleCount": 0,
+    "sccCount": 3
+  },
+  "files": [
+    {
+      "path": "src/config.ts",
+      "language": "ts",
+      "loc": 5,
+      "complexity": 1,
+      "fanIn": 1,
+      "fanOut": 1,
+      "inCycle": false,
+      "riskScore": 3.79,
+      "imports": [
+        {
+          "specifier": "./math",
+          "resolvedPath": "src/math.ts",
+          "external": false
+        }
+      ]
+    },
+    {
+      "path": "src/index.ts",
+      "language": "ts",
+      "loc": 4,
+      "complexity": 1,
+      "fanIn": 0,
+      "fanOut": 2,
+      "inCycle": false,
+      "riskScore": 3.357,
+      "imports": [
+        {
+          "specifier": "./math",
+          "resolvedPath": "src/math.ts",
+          "external": false
+        },
+        {
+          "specifier": "./config",
+          "resolvedPath": "src/config.ts",
+          "external": false
+        }
+      ]
+    },
+    {
+      "path": "src/math.ts",
+      "language": "ts",
+      "loc": 6,
+      "complexity": 3,
+      "fanIn": 2,
+      "fanOut": 0,
+      "inCycle": false,
+      "riskScore": 4.596,
+      "imports": []
+    }
+  ],
+  "edges": [
+    {
+      "from": "src/config.ts",
+      "to": "src/math.ts",
+      "specifier": "./math",
+      "external": false
+    },
+    {
+      "from": "src/index.ts",
+      "to": "src/config.ts",
+      "specifier": "./config",
+      "external": false
+    },
+    {
+      "from": "src/index.ts",
+      "to": "src/math.ts",
+      "specifier": "./math",
+      "external": false
+    }
+  ],
+  "scc": [
+    {
+      "id": 1,
+      "size": 1,
+      "nodes": [
+        "src/config.ts"
+      ]
+    },
+    {
+      "id": 2,
+      "size": 1,
+      "nodes": [
+        "src/index.ts"
+      ]
+    },
+    {
+      "id": 3,
+      "size": 1,
+      "nodes": [
+        "src/math.ts"
+      ]
+    }
+  ]
+}

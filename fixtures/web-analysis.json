@@ -1,0 +1,250 @@
+{
+  "schemaVersion": "1.0.0",
+  "generatedAt": "2026-02-24T14:19:52.054Z",
+  "rootPath": "/Users/hasanyucedag/Desktop/code-analyzer/codebase-complexity-visualizer/fixtures/web-sample",
+  "config": {
+    "languages": [
+      "php",
+      "css",
+      "html"
+    ],
+    "exclude": [
+      "node_modules",
+      ".git",
+      "dist",
+      "build"
+    ],
+    "weights": {
+      "loc": 0.8,
+      "complexity": 1.4,
+      "fanIn": 1,
+      "fanOut": 1,
+      "cycle": 2.5
+    }
+  },
+  "summary": {
+    "fileCount": 7,
+    "dependencyCount": 7,
+    "cycleCount": 0,
+    "sccCount": 7
+  },
+  "files": [
+    {
+      "path": "index.php",
+      "language": "php",
+      "loc": 3,
+      "complexity": 2,
+      "fanIn": 0,
+      "fanOut": 2,
+      "inCycle": false,
+      "riskScore": 3.746,
+      "imports": [
+        {
+          "specifier": "templates/header.php",
+          "resolvedPath": "templates/header.php",
+          "external": false
+        },
+        {
+          "specifier": "./public/router.php",
+          "resolvedPath": "public/router.php",
+          "external": false
+        }
+      ]
+    },
+    {
+      "path": "public/page.html",
+      "language": "html",
+      "loc": 9,
+      "complexity": 2,
+      "fanIn": 0,
+      "fanOut": 1,
+      "inCycle": false,
+      "riskScore": 4.073,
+      "imports": [
+        {
+          "specifier": "../public/logo.png",
+          "resolvedPath": null,
+          "external": false
+        },
+        {
+          "specifier": "../styles/main.css?v=4",
+          "resolvedPath": "styles/main.css",
+          "external": false
+        }
+      ]
+    },
+    {
+      "path": "public/router.php",
+      "language": "php",
+      "loc": 2,
+      "complexity": 2,
+      "fanIn": 1,
+      "fanOut": 1,
+      "inCycle": false,
+      "riskScore": 3.803,
+      "imports": [
+        {
+          "specifier": "../templates/header.php",
+          "resolvedPath": "templates/header.php",
+          "external": false
+        }
+      ]
+    },
+    {
+      "path": "styles/main.css",
+      "language": "css",
+      "loc": 3,
+      "complexity": 1,
+      "fanIn": 1,
+      "fanOut": 2,
+      "inCycle": false,
+      "riskScore": 3.871,
+      "imports": [
+        {
+          "specifier": "./reset.css",
+          "resolvedPath": "styles/reset.css",
+          "external": false
+        },
+        {
+          "specifier": "../styles/theme.css",
+          "resolvedPath": "styles/theme.css",
+          "external": false
+        }
+      ]
+    },
+    {
+      "path": "styles/reset.css",
+      "language": "css",
+      "loc": 1,
+      "complexity": 1,
+      "fanIn": 2,
+      "fanOut": 0,
+      "inCycle": false,
+      "riskScore": 2.624,
+      "imports": []
+    },
+    {
+      "path": "styles/theme.css",
+      "language": "css",
+      "loc": 1,
+      "complexity": 1,
+      "fanIn": 1,
+      "fanOut": 0,
+      "inCycle": false,
+      "riskScore": 2.218,
+      "imports": []
+    },
+    {
+      "path": "templates/header.php",
+      "language": "php",
+      "loc": 11,
+      "complexity": 3,
+      "fanIn": 2,
+      "fanOut": 1,
+      "inCycle": false,
+      "riskScore": 5.72,
+      "imports": [
+        {
+          "specifier": "../styles/reset.css",
+          "resolvedPath": "styles/reset.css",
+          "external": false
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "index.php",
+      "to": "public/router.php",
+      "specifier": "./public/router.php",
+      "external": false
+    },
+    {
+      "from": "index.php",
+      "to": "templates/header.php",
+      "specifier": "templates/header.php",
+      "external": false
+    },
+    {
+      "from": "public/page.html",
+      "to": "styles/main.css",
+      "specifier": "../styles/main.css?v=4",
+      "external": false
+    },
+    {
+      "from": "public/router.php",
+      "to": "templates/header.php",
+      "specifier": "../templates/header.php",
+      "external": false
+    },
+    {
+      "from": "styles/main.css",
+      "to": "styles/reset.css",
+      "specifier": "./reset.css",
+      "external": false
+    },
+    {
+      "from": "styles/main.css",
+      "to": "styles/theme.css",
+      "specifier": "../styles/theme.css",
+      "external": false
+    },
+    {
+      "from": "templates/header.php",
+      "to": "styles/reset.css",
+      "specifier": "../styles/reset.css",
+      "external": false
+    }
+  ],
+  "scc": [
+    {
+      "id": 1,
+      "size": 1,
+      "nodes": [
+        "index.php"
+      ]
+    },
+    {
+      "id": 2,
+      "size": 1,
+      "nodes": [
+        "public/page.html"
+      ]
+    },
+    {
+      "id": 3,
+      "size": 1,
+      "nodes": [
+        "public/router.php"
+      ]
+    },
+    {
+      "id": 4,
+      "size": 1,
+      "nodes": [
+        "styles/main.css"
+      ]
+    },
+    {
+      "id": 5,
+      "size": 1,
+      "nodes": [
+        "styles/reset.css"
+      ]
+    },
+    {
+      "id": 6,
+      "size": 1,
+      "nodes": [
+        "styles/theme.css"
+      ]
+    },
+    {
+      "id": 7,
+      "size": 1,
+      "nodes": [
+        "templates/header.php"
+      ]
+    }
+  ]
+}
