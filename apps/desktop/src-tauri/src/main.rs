@@ -142,6 +142,10 @@ fn build_dev_command(request: &AnalyzeRequest) -> Result<Command, String> {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let analyzer_cli = ensure_dev_analyzer_built(&manifest_dir)?;
 
+    Ok(build_node_cli_command(&analyzer_cli, request))
+}
+
+fn build_node_cli_command(analyzer_cli: &Path, request: &AnalyzeRequest) -> Command {
     let mut command = Command::new("node");
     command
         .arg(analyzer_cli)
@@ -156,24 +160,34 @@ fn build_dev_command(request: &AnalyzeRequest) -> Result<Command, String> {
         .arg("--weights")
         .arg(build_weights_arg(&request.weights));
 
-    Ok(command)
+    command
+}
+
+fn build_sidecar_command(analyzer_path: &Path, request: &AnalyzeRequest) -> Command {
+    let mut command = Command::new(analyzer_path);
+    command
+        .arg("analyze")
+        .arg(&request.repo_path)
+        .arg("--out")
+        .arg(&request.out_path)
+        .arg("--languages")
+        .arg(request.languages.join(","))
+        .arg("--exclude")
+        .arg(request.exclude_patterns.join(","))
+        .arg("--weights")
+        .arg(build_weights_arg(&request.weights));
+    command
 }
 
 fn build_release_command(app: &AppHandle, request: &AnalyzeRequest) -> Result<Command, String> {
     if let Ok(explicit_path) = std::env::var("CCV_ANALYZER_BIN") {
-        let mut command = Command::new(explicit_path);
-        command
-            .arg("analyze")
-            .arg(&request.repo_path)
-            .arg("--out")
-            .arg(&request.out_path)
-            .arg("--languages")
-            .arg(request.languages.join(","))
-            .arg("--exclude")
-            .arg(request.exclude_patterns.join(","))
-            .arg("--weights")
-            .arg(build_weights_arg(&request.weights));
-        return Ok(command);
+        return Ok(build_sidecar_command(Path::new(&explicit_path), request));
+    }
+
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let local_analyzer_cli = manifest_dir.join("../../../packages/analyzer/dist/cli.js");
+    if local_analyzer_cli.exists() {
+        return Ok(build_node_cli_command(&local_analyzer_cli, request));
     }
 
     let resource_dir = app
@@ -181,28 +195,31 @@ fn build_release_command(app: &AppHandle, request: &AnalyzeRequest) -> Result<Co
         .resource_dir()
         .map_err(|error| format!("Failed to locate resource directory: {error}"))?;
 
-    let candidates = [
-        "binaries/ccv-analyzer",
-        "binaries/ccv-analyzer-aarch64-apple-darwin",
-        "binaries/ccv-analyzer-x86_64-apple-darwin",
+    let executable_dir = std::env::current_exe()
+        .ok()
+        .and_then(|path| path.parent().map(|parent| parent.to_path_buf()));
+
+    let candidate_names = [
+        "ccv-analyzer",
+        "ccv-analyzer-aarch64-apple-darwin",
+        "ccv-analyzer-x86_64-apple-darwin",
     ];
 
-    for candidate in candidates {
-        let path = resource_dir.join(candidate);
+    let mut candidate_paths: Vec<PathBuf> = Vec::new();
+
+    for name in candidate_names {
+        candidate_paths.push(resource_dir.join("binaries").join(name));
+    }
+
+    if let Some(dir) = executable_dir {
+        for name in candidate_names {
+            candidate_paths.push(dir.join(name));
+        }
+    }
+
+    for path in candidate_paths {
         if path.exists() {
-            let mut command = Command::new(path);
-            command
-                .arg("analyze")
-                .arg(&request.repo_path)
-                .arg("--out")
-                .arg(&request.out_path)
-                .arg("--languages")
-                .arg(request.languages.join(","))
-                .arg("--exclude")
-                .arg(request.exclude_patterns.join(","))
-                .arg("--weights")
-                .arg(build_weights_arg(&request.weights));
-            return Ok(command);
+            return Ok(build_sidecar_command(&path, request));
         }
     }
 

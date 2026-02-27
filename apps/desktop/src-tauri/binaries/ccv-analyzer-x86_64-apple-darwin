@@ -1,3 +1,37 @@
 #!/bin/sh
-echo "CCV analyzer sidecar placeholder. Build and replace with the packaged analyzer binary." >&2
+set -eu
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "[ccv] node runtime not found. Install Node.js or provide a native analyzer sidecar." >&2
+  exit 1
+fi
+
+if [ -n "${CCV_ANALYZER_JS:-}" ] && [ -f "${CCV_ANALYZER_JS}" ]; then
+  exec node "${CCV_ANALYZER_JS}" "$@"
+fi
+
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+
+if [ -f "$SCRIPT_DIR/../Resources/ccv-analyzer-js/cli.js" ]; then
+  exec node "$SCRIPT_DIR/../Resources/ccv-analyzer-js/cli.js" "$@"
+fi
+
+SEARCH_DIR="$SCRIPT_DIR"
+ITERATIONS=0
+while [ "$ITERATIONS" -lt 16 ]; do
+  if [ -f "$SEARCH_DIR/packages/analyzer/dist/cli.js" ]; then
+    exec node "$SEARCH_DIR/packages/analyzer/dist/cli.js" "$@"
+  fi
+
+  NEXT_DIR="$(dirname -- "$SEARCH_DIR")"
+  if [ "$NEXT_DIR" = "$SEARCH_DIR" ]; then
+    break
+  fi
+
+  SEARCH_DIR="$NEXT_DIR"
+  ITERATIONS=$((ITERATIONS + 1))
+done
+
+echo "[ccv] analyzer sidecar could not locate analyzer CLI." >&2
+echo "[ccv] Set CCV_ANALYZER_BIN to a real binary or set CCV_ANALYZER_JS to packages/analyzer/dist/cli.js." >&2
 exit 1
