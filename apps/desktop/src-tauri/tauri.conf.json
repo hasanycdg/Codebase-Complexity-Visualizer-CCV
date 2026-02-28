@@ -6,8 +6,8 @@
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
-    "beforeDevCommand": "corepack pnpm --filter @ccv/model build && corepack pnpm --filter @ccv/analyzer build && ../../scripts/build-native-analyzer-sidecar.sh debug && corepack pnpm dev",
-    "beforeBuildCommand": "corepack pnpm build && ../../scripts/build-native-analyzer-sidecar.sh release"
+    "beforeDevCommand": "../../scripts/build-native-analyzer-sidecar.sh debug && corepack pnpm --filter @ccv/desktop dev",
+    "beforeBuildCommand": "corepack pnpm --filter @ccv/desktop build && ../../scripts/build-native-analyzer-sidecar.sh release"
   },
   "app": {
     "windows": [
