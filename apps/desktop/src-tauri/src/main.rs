@@ -142,11 +142,52 @@ fn build_dev_command(request: &AnalyzeRequest) -> Result<Command, String> {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let analyzer_cli = ensure_dev_analyzer_built(&manifest_dir)?;
 
-    Ok(build_node_cli_command(&analyzer_cli, request))
+    build_node_cli_command(&analyzer_cli, request)
 }
 
-fn build_node_cli_command(analyzer_cli: &Path, request: &AnalyzeRequest) -> Command {
-    let mut command = Command::new("node");
+fn find_node_binary() -> Result<PathBuf, String> {
+    if let Ok(explicit_path) = std::env::var("CCV_NODE_BIN") {
+        let path = PathBuf::from(explicit_path);
+        if path.exists() {
+            return Ok(path);
+        }
+    }
+
+    let candidates = [
+        "/opt/homebrew/bin/node",
+        "/usr/local/bin/node",
+        "/opt/local/bin/node",
+        "/usr/bin/node",
+    ];
+
+    for candidate in candidates {
+        let path = PathBuf::from(candidate);
+        if path.exists() {
+            return Ok(path);
+        }
+    }
+
+    let output = Command::new("/bin/zsh")
+        .arg("-ic")
+        .arg("command -v node")
+        .output()
+        .map_err(|error| format!("Failed to locate node runtime: {error}"))?;
+
+    if output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let path = stdout.trim();
+        if !path.is_empty() {
+            return Ok(PathBuf::from(path));
+        }
+    }
+
+    Err("Node.js runtime not found. Install Node.js or set CCV_NODE_BIN.".to_string())
+}
+
+fn build_node_cli_command(analyzer_cli: &Path, request: &AnalyzeRequest) -> Result<Command, String> {
+    let node_binary = find_node_binary()?;
+
+    let mut command = Command::new(node_binary);
     command
         .arg(analyzer_cli)
         .arg("analyze")
@@ -160,7 +201,7 @@ fn build_node_cli_command(analyzer_cli: &Path, request: &AnalyzeRequest) -> Comm
         .arg("--weights")
         .arg(build_weights_arg(&request.weights));
 
-    command
+    Ok(command)
 }
 
 fn build_sidecar_command(analyzer_path: &Path, request: &AnalyzeRequest) -> Command {
@@ -187,7 +228,7 @@ fn build_release_command(app: &AppHandle, request: &AnalyzeRequest) -> Result<Co
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let local_analyzer_cli = manifest_dir.join("../../../packages/analyzer/dist/cli.js");
     if local_analyzer_cli.exists() {
-        return Ok(build_node_cli_command(&local_analyzer_cli, request));
+        return build_node_cli_command(&local_analyzer_cli, request);
     }
 
     let resource_dir = app

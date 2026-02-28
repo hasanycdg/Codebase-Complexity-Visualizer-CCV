@@ -1,26 +1,48 @@
 #!/bin/sh
 set -eu
 
-if ! command -v node >/dev/null 2>&1; then
-  echo "[ccv] node runtime not found. Install Node.js or provide a native analyzer sidecar." >&2
+resolve_node() {
+  if [ -n "${CCV_NODE_BIN:-}" ] && [ -x "${CCV_NODE_BIN}" ]; then
+    printf '%s\n' "${CCV_NODE_BIN}"
+    return 0
+  fi
+
+  for candidate in /opt/homebrew/bin/node /usr/local/bin/node /opt/local/bin/node /usr/bin/node; do
+    if [ -x "$candidate" ]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  if command -v node >/dev/null 2>&1; then
+    command -v node
+    return 0
+  fi
+
+  return 1
+}
+
+NODE_BIN="$(resolve_node || true)"
+if [ -z "$NODE_BIN" ]; then
+  echo "[ccv] node runtime not found. Install Node.js or set CCV_NODE_BIN." >&2
   exit 1
 fi
 
 if [ -n "${CCV_ANALYZER_JS:-}" ] && [ -f "${CCV_ANALYZER_JS}" ]; then
-  exec node "${CCV_ANALYZER_JS}" "$@"
+  exec "$NODE_BIN" "${CCV_ANALYZER_JS}" "$@"
 fi
 
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 
 if [ -f "$SCRIPT_DIR/../Resources/ccv-analyzer-js/cli.js" ]; then
-  exec node "$SCRIPT_DIR/../Resources/ccv-analyzer-js/cli.js" "$@"
+  exec "$NODE_BIN" "$SCRIPT_DIR/../Resources/ccv-analyzer-js/cli.js" "$@"
 fi
 
 SEARCH_DIR="$SCRIPT_DIR"
 ITERATIONS=0
 while [ "$ITERATIONS" -lt 16 ]; do
   if [ -f "$SEARCH_DIR/packages/analyzer/dist/cli.js" ]; then
-    exec node "$SEARCH_DIR/packages/analyzer/dist/cli.js" "$@"
+    exec "$NODE_BIN" "$SEARCH_DIR/packages/analyzer/dist/cli.js" "$@"
   fi
 
   NEXT_DIR="$(dirname -- "$SEARCH_DIR")"
