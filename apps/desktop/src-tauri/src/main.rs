@@ -97,15 +97,36 @@ fn build_weights_arg(weights: &RiskWeights) -> String {
     )
 }
 
-fn run_pnpm_build(workspace_root: &Path, filter: &str) -> Result<(), String> {
-    let output = Command::new("corepack")
-        .arg("pnpm")
-        .arg("--filter")
-        .arg(filter)
-        .arg("build")
+fn analyzer_candidate_names() -> [&'static str; 3] {
+    [
+        "ccv-analyzer",
+        "ccv-analyzer-aarch64-apple-darwin",
+        "ccv-analyzer-x86_64-apple-darwin",
+    ]
+}
+
+fn find_first_existing_path(paths: Vec<PathBuf>) -> Option<PathBuf> {
+    paths.into_iter().find(|path| path.exists())
+}
+
+fn sidecar_candidates(manifest_dir: &Path) -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    for name in analyzer_candidate_names() {
+        candidates.push(manifest_dir.join("binaries").join(name));
+        candidates.push(manifest_dir.join("target").join("debug").join(name));
+    }
+    candidates
+}
+
+fn run_dev_sidecar_build(manifest_dir: &Path) -> Result<(), String> {
+    let workspace_root = manifest_dir.join("../../..");
+    let script_path = workspace_root.join("scripts/build-native-analyzer-sidecar.sh");
+    let output = Command::new("/bin/sh")
+        .arg(script_path)
+        .arg("debug")
         .current_dir(workspace_root)
         .output()
-        .map_err(|error| format!("Failed to run build for {filter}: {error}"))?;
+        .map_err(|error| format!("Failed to build native analyzer sidecar: {error}"))?;
 
     if output.status.success() {
         return Ok(());
@@ -114,94 +135,33 @@ fn run_pnpm_build(workspace_root: &Path, filter: &str) -> Result<(), String> {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
     Err(format!(
-        "Build for {filter} failed.\nstdout:\n{stdout}\nstderr:\n{stderr}"
+        "Native analyzer sidecar build failed.\nstdout:\n{stdout}\nstderr:\n{stderr}"
     ))
 }
 
-fn ensure_dev_analyzer_built(manifest_dir: &Path) -> Result<PathBuf, String> {
-    let analyzer_cli = manifest_dir.join("../../../packages/analyzer/dist/cli.js");
-    if analyzer_cli.exists() {
-        return Ok(analyzer_cli);
+fn ensure_dev_sidecar_built(manifest_dir: &Path) -> Result<PathBuf, String> {
+    if let Some(path) = find_first_existing_path(sidecar_candidates(manifest_dir)) {
+        return Ok(path);
     }
 
-    let workspace_root = manifest_dir.join("../../..");
-    run_pnpm_build(&workspace_root, "@ccv/model")?;
-    run_pnpm_build(&workspace_root, "@ccv/analyzer")?;
+    run_dev_sidecar_build(manifest_dir)?;
 
-    if analyzer_cli.exists() {
-        return Ok(analyzer_cli);
-    }
-
-    Err(format!(
-        "Analyzer binary not found at {} even after auto-build. Run `corepack pnpm --filter @ccv/analyzer build` manually.",
-        analyzer_cli.display()
-    ))
+    find_first_existing_path(sidecar_candidates(manifest_dir)).ok_or_else(|| {
+        format!(
+            "Native analyzer sidecar not found after build. Expected one of: {}",
+            sidecar_candidates(manifest_dir)
+                .iter()
+                .map(|path| path.display().to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    })
 }
 
 fn build_dev_command(request: &AnalyzeRequest) -> Result<Command, String> {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let analyzer_cli = ensure_dev_analyzer_built(&manifest_dir)?;
 
-    build_node_cli_command(&analyzer_cli, request)
-}
-
-fn find_node_binary() -> Result<PathBuf, String> {
-    if let Ok(explicit_path) = std::env::var("CCV_NODE_BIN") {
-        let path = PathBuf::from(explicit_path);
-        if path.exists() {
-            return Ok(path);
-        }
-    }
-
-    let candidates = [
-        "/opt/homebrew/bin/node",
-        "/usr/local/bin/node",
-        "/opt/local/bin/node",
-        "/usr/bin/node",
-    ];
-
-    for candidate in candidates {
-        let path = PathBuf::from(candidate);
-        if path.exists() {
-            return Ok(path);
-        }
-    }
-
-    let output = Command::new("/bin/zsh")
-        .arg("-ic")
-        .arg("command -v node")
-        .output()
-        .map_err(|error| format!("Failed to locate node runtime: {error}"))?;
-
-    if output.status.success() {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let path = stdout.trim();
-        if !path.is_empty() {
-            return Ok(PathBuf::from(path));
-        }
-    }
-
-    Err("Node.js runtime not found. Install Node.js or set CCV_NODE_BIN.".to_string())
-}
-
-fn build_node_cli_command(analyzer_cli: &Path, request: &AnalyzeRequest) -> Result<Command, String> {
-    let node_binary = find_node_binary()?;
-
-    let mut command = Command::new(node_binary);
-    command
-        .arg(analyzer_cli)
-        .arg("analyze")
-        .arg(&request.repo_path)
-        .arg("--out")
-        .arg(&request.out_path)
-        .arg("--languages")
-        .arg(request.languages.join(","))
-        .arg("--exclude")
-        .arg(request.exclude_patterns.join(","))
-        .arg("--weights")
-        .arg(build_weights_arg(&request.weights));
-
-    Ok(command)
+    ensure_dev_sidecar_built(&manifest_dir).map(|sidecar_path| build_sidecar_command(&sidecar_path, request))
 }
 
 fn build_sidecar_command(analyzer_path: &Path, request: &AnalyzeRequest) -> Command {
@@ -225,12 +185,6 @@ fn build_release_command(app: &AppHandle, request: &AnalyzeRequest) -> Result<Co
         return Ok(build_sidecar_command(Path::new(&explicit_path), request));
     }
 
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let local_analyzer_cli = manifest_dir.join("../../../packages/analyzer/dist/cli.js");
-    if local_analyzer_cli.exists() {
-        return build_node_cli_command(&local_analyzer_cli, request);
-    }
-
     let resource_dir = app
         .path()
         .resource_dir()
@@ -240,28 +194,20 @@ fn build_release_command(app: &AppHandle, request: &AnalyzeRequest) -> Result<Co
         .ok()
         .and_then(|path| path.parent().map(|parent| parent.to_path_buf()));
 
-    let candidate_names = [
-        "ccv-analyzer",
-        "ccv-analyzer-aarch64-apple-darwin",
-        "ccv-analyzer-x86_64-apple-darwin",
-    ];
-
     let mut candidate_paths: Vec<PathBuf> = Vec::new();
 
-    for name in candidate_names {
+    for name in analyzer_candidate_names() {
         candidate_paths.push(resource_dir.join("binaries").join(name));
     }
 
     if let Some(dir) = executable_dir {
-        for name in candidate_names {
+        for name in analyzer_candidate_names() {
             candidate_paths.push(dir.join(name));
         }
     }
 
-    for path in candidate_paths {
-        if path.exists() {
-            return Ok(build_sidecar_command(&path, request));
-        }
+    if let Some(path) = find_first_existing_path(candidate_paths) {
+        return Ok(build_sidecar_command(&path, request));
     }
 
     Err("Release analyzer sidecar not found. Set CCV_ANALYZER_BIN or bundle binaries/ccv-analyzer.".to_string())
