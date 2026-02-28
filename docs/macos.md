@@ -1,64 +1,141 @@
 # macOS Deployment Notes
 
-## 1) Folder access and privacy boundaries
+This document covers building, installing, verifying, and distributing the macOS app.
 
-CCV is local-first and offline-only. The desktop app only analyzes folders selected by the user via Tauri's native dialog API (`@tauri-apps/plugin-dialog`).
+## Runtime Model
 
-Operational rules:
+The packaged app is self-contained:
 
-- Do not scan outside the user-selected repository path.
-- Do not request network access to send source code.
-- Store only metadata in SQLite (`ccv.db`) and analysis model files (`analysis.json`).
+- The desktop UI is a Tauri app.
+- Repository analysis is executed by a bundled native Rust sidecar named `ccv-analyzer`.
+- The installed app does not depend on a system `node` binary at runtime.
 
-### Full Disk Access (if needed)
+Expected bundled analyzer path:
 
-Some repositories under protected folders (for example Desktop/Documents on locked-down environments, or external volume policies) can require explicit macOS permission.
+```text
+Codebase Complexity Visualizer.app/Contents/MacOS/ccv-analyzer
+```
 
-Steps:
+## Build From Source
+
+Prerequisites:
+
+- macOS 13+
+- Node.js 20+
+- Corepack
+- Rust toolchain
+- Xcode Command Line Tools
+
+Build the release app from the repository root:
+
+```bash
+corepack enable
+corepack pnpm install
+corepack pnpm --filter @ccv/desktop tauri:build
+```
+
+The Tauri build automatically:
+
+1. builds the frontend,
+2. builds the native analyzer sidecar,
+3. bundles the `.app` package.
+
+Release artifact:
+
+```text
+apps/desktop/src-tauri/target/release/bundle/macos/Codebase Complexity Visualizer.app
+```
+
+## Install or Reinstall the App
+
+Install into `/Applications`:
+
+```bash
+rm -rf "/Applications/Codebase Complexity Visualizer.app"
+cp -R "apps/desktop/src-tauri/target/release/bundle/macos/Codebase Complexity Visualizer.app" /Applications/
+open "/Applications/Codebase Complexity Visualizer.app"
+```
+
+If the app is currently running:
+
+```bash
+osascript -e 'quit app "Codebase Complexity Visualizer"' || true
+pkill -f "Codebase Complexity Visualizer" || true
+```
+
+## Verify the Bundled Analyzer
+
+After building, verify the packaged analyzer before shipping the app:
+
+```bash
+corepack pnpm check:bundled-analyzer
+```
+
+Manual verification:
+
+```bash
+ls -la "/Applications/Codebase Complexity Visualizer.app/Contents/MacOS/ccv-analyzer"
+```
+
+You can also execute the bundled analyzer directly:
+
+```bash
+env -i PATH="/usr/bin:/bin" HOME="$HOME" \
+  "/Applications/Codebase Complexity Visualizer.app/Contents/MacOS/ccv-analyzer" \
+  analyze /path/to/repo \
+  --out /tmp/analysis.json \
+  --languages js,ts,java,py,php,css,html \
+  --exclude node_modules,.git,dist,build \
+  --weights loc=0.8,complexity=1.4,fanIn=1,fanOut=1,cycle=2.5
+```
+
+That check is useful because Finder-launched macOS apps run with a reduced environment.
+
+## Permissions and Folder Access
+
+CCV only analyzes folders the user explicitly selects.
+
+Some protected locations may require additional macOS permission:
+
+- `Desktop`
+- `Documents`
+- external volumes under stricter policies
+
+If analysis fails because the app cannot read the selected repository:
 
 1. Open `System Settings`.
 2. Go to `Privacy & Security`.
 3. Open `Full Disk Access`.
-4. Add the built CCV app bundle and enable it.
-5. Restart CCV.
+4. Add `Codebase Complexity Visualizer.app`.
+5. Enable access.
+6. Restart the app.
 
-CCV should still default to scanning only user-granted folders.
+## Unsigned Local Builds
 
-## 2) Unsigned development mode
+For local development builds, Gatekeeper may block execution.
 
-For local development on macOS 13+:
+Remove quarantine from the installed local app if necessary:
 
 ```bash
-corepack pnpm install
-corepack pnpm --filter @ccv/model build
-corepack pnpm --filter @ccv/analyzer build
-corepack pnpm --filter @ccv/desktop tauri:dev
+xattr -dr com.apple.quarantine "/Applications/Codebase Complexity Visualizer.app"
 ```
 
-If Gatekeeper blocks execution for a local build, remove quarantine on the local artifact:
+## Public Distribution
+
+For public distribution, do not ship the raw repository. Ship the `.app` bundle or a zipped release artifact.
+
+Recommended release flow:
+
+1. Build the release app.
+2. Run `corepack pnpm check:bundled-analyzer`.
+3. Sign the app with Developer ID.
+4. Notarize it.
+5. Staple the notarization ticket.
+6. Distribute the signed app or zip.
+
+Example notarization flow:
 
 ```bash
-xattr -dr com.apple.quarantine ./apps/desktop/src-tauri/target
-```
-
-## 3) Developer ID signing and notarization
-
-When preparing public distribution, sign with an Apple Developer ID identity and notarize.
-
-High-level process:
-
-1. Build release app.
-2. Sign using Developer ID Application certificate.
-3. Submit for notarization.
-4. Staple notarization ticket.
-
-Example (adjust team/account details):
-
-```bash
-corepack pnpm --filter @ccv/model build
-corepack pnpm --filter @ccv/analyzer build
-corepack pnpm --filter @ccv/desktop tauri:build
-
 xcrun notarytool submit "apps/desktop/src-tauri/target/release/bundle/macos/Codebase Complexity Visualizer.app" \
   --apple-id "$APPLE_ID" \
   --password "$APPLE_APP_PASSWORD" \
@@ -68,44 +145,50 @@ xcrun notarytool submit "apps/desktop/src-tauri/target/release/bundle/macos/Code
 xcrun stapler staple "apps/desktop/src-tauri/target/release/bundle/macos/Codebase Complexity Visualizer.app"
 ```
 
-## 4) Universal binaries (arm64 + x64)
+## Apple Silicon and Intel Builds
 
-CCV supports Apple Silicon and Intel.
+The sidecar build script builds the native analyzer for the current host architecture.
 
-### Analyzer sidecar binaries
+Examples:
 
-Build analyzer sidecar binary for both targets and place in:
+- Apple Silicon host: `ccv-analyzer-aarch64-apple-darwin`
+- Intel host: `ccv-analyzer-x86_64-apple-darwin`
 
-- `apps/desktop/src-tauri/binaries/ccv-analyzer-aarch64-apple-darwin`
-- `apps/desktop/src-tauri/binaries/ccv-analyzer-x86_64-apple-darwin`
+If you want to distribute to both Apple Silicon and Intel users, build release artifacts for both architectures in CI or on matching machines.
 
-For MVP, placeholder scripts are included. Replace them with real binaries before release.
-
-### Desktop app
-
-Build per architecture:
+Relevant script:
 
 ```bash
-cd apps/desktop/src-tauri
-cargo build --release --target aarch64-apple-darwin
-cargo build --release --target x86_64-apple-darwin
+./scripts/build-native-analyzer-sidecar.sh release
 ```
 
-Create universal executable with `lipo`:
+## Common Failure Checks
+
+### App launches, but analysis immediately fails
+
+Usually one of these is true:
+
+- the installed app is stale,
+- the bundled `ccv-analyzer` is missing,
+- macOS denied folder access.
+
+Check the analyzer exists:
 
 ```bash
-lipo -create \
-  target/aarch64-apple-darwin/release/ccv-desktop \
-  target/x86_64-apple-darwin/release/ccv-desktop \
-  -output target/universal/release/ccv-desktop
+ls -la "/Applications/Codebase Complexity Visualizer.app/Contents/MacOS/ccv-analyzer"
 ```
 
-Then package/sign/notarize the universal bundle.
+Then replace the installed app with a fresh build if needed.
 
-## 5) Future incremental analysis
+### You have multiple app copies
 
-File watching is intentionally excluded from MVP, but architecture supports future incremental analysis by:
+Make sure you are opening the copy in `/Applications`, not an older build from `target/` or `Downloads`.
 
-- Persisting previous file hash/metrics snapshots in SQLite.
-- Re-analyzing only changed files.
-- Recomputing SCC and fan-in/fan-out only for impacted subgraph components.
+### You changed the app icon or bundle but Finder still shows an old state
+
+Restart Finder and Dock:
+
+```bash
+killall Finder
+killall Dock
+```

@@ -1,42 +1,56 @@
 # Codebase Complexity Visualizer (CCV)
 
-Local-first desktop app to analyze repository complexity, dependency risk, and architectural hotspots.
+Codebase Complexity Visualizer is a local-first macOS desktop app for understanding repository structure, hotspot risk, and dependency cycles.
 
-- macOS app (Tauri + React)
-- Offline analysis
-- No source-code upload
-- No telemetry
+CCV is designed for people working in large or aging codebases who need a faster way to answer questions like:
 
-## Current Features
+- Which files are the riskiest to touch?
+- Where are the architectural bottlenecks?
+- Which files are part of cycles?
+- How does risk change if I care more about complexity or coupling?
 
-### Analyzer Engine
+The desktop app runs offline, stores data locally, and bundles a native Rust analyzer in the `.app` package.
 
-- Recursive repository scan with exclude patterns
+## Platform Status
+
+- Desktop platform: macOS
+- Runtime requirement for end users: none beyond macOS
+- Runtime requirement for developers building from source: Node.js 20+, pnpm, Rust, Xcode Command Line Tools
+
+## Features
+
+### Analysis engine
+
+- Recursive repository scan
 - Supported languages: `js`, `ts`, `java`, `py`, `php`, `css`, `html`
-- Import/dependency extraction per language
-- Internal dependency graph + external dependency tracking
-- SCC detection (Tarjan) for cycle analysis
 - Per-file metrics:
-  - `loc` (non-empty trimmed lines)
-  - `complexity` (approximate cyclomatic complexity)
-  - `fanIn`, `fanOut`
+  - `loc`
+  - `complexity`
+  - `fanIn`
+  - `fanOut`
   - `inCycle`
   - `riskScore`
+- Dependency graph extraction
+- External dependency tracking
+- Strongly connected component detection with Tarjan SCC
+- Deterministic JSON output
 
-### Desktop App
+### Desktop app
 
+- Native macOS `.app` bundle
 - Project picker with recent projects
-- Analysis runner with live logs
-- Dashboard tabs:
-  - `Overview`: treemap heatmap + top risky files
-  - `Structural`: architecture layers + dependency graph
-  - `Deep Analysis`: what-if weights + scatter plot + cycle explainer
-  - `Experimental`: risk radar + optional 3D city view
-  - `Info`: exact metric/risk formulas and live calculation details
-- File detail drawer (click from any view)
-- Settings persisted in local SQLite (`ccv.db`)
+- Analysis runner with live stdout/stderr logs
+- Dashboard views:
+  - `Overview`: treemap heatmap and top risky files
+  - `Structural`: architecture layers and dependency graph
+  - `Deep Analysis`: what-if weights, complexity scatter plot, cycle explainer
+  - `Experimental`: Risk Radar and optional 3D City View
+  - `Info`: metric definitions, current weights, and live risk calculation example
+- File detail drawer from multiple views
+- Local settings persistence in SQLite
+- Stored analysis record per project
 
-### Risk Formula
+## How Risk Is Calculated
 
 ```text
 locNorm = ln(1 + loc)
@@ -52,92 +66,204 @@ riskScore =
   w.cycle * (inCycle ? 1 : 0)
 ```
 
-## Install As a Real macOS App
+Default weights:
 
-This gives you a normal `.app` you can open from Finder/Launchpad (no terminal needed after install).
+```text
+loc=0.8, complexity=1.4, fanIn=1.0, fanOut=1.0, cycle=2.5
+```
 
-### Prerequisites
+## Install and Run
+
+There are two normal installation paths.
+
+### Option 1: Install a built app bundle
+
+Use this if you already have a built `Codebase Complexity Visualizer.app`.
+
+1. Copy the app to `/Applications`.
+2. Open it from Finder, Launchpad, or Spotlight.
+3. Pick a repository folder and run analysis.
+
+Example:
+
+```bash
+cp -R "Codebase Complexity Visualizer.app" /Applications/
+open "/Applications/Codebase Complexity Visualizer.app"
+```
+
+End users do not need Node.js or Rust when they receive a built app.
+
+### Option 2: Build from source
+
+Prerequisites:
 
 - macOS 13+
 - Node.js 20+
-- pnpm via Corepack
-- Rust toolchain (`rustup`)
+- Corepack enabled
+- Rust toolchain via `rustup`
 - Xcode Command Line Tools
 
-### 1) Build the app bundle
-
-From repo root:
+Build and install:
 
 ```bash
+cd /path/to/codebase-complexity-visualizer
 corepack enable
 corepack pnpm install
 corepack pnpm --filter @ccv/desktop tauri:build
+rm -rf "/Applications/Codebase Complexity Visualizer.app"
+cp -R "apps/desktop/src-tauri/target/release/bundle/macos/Codebase Complexity Visualizer.app" /Applications/
+open "/Applications/Codebase Complexity Visualizer.app"
 ```
 
-Build output:
+Release build output:
 
 ```text
 apps/desktop/src-tauri/target/release/bundle/macos/Codebase Complexity Visualizer.app
 ```
 
-### 2) Install to Applications
+## First Analysis
 
-```bash
-cp -R "apps/desktop/src-tauri/target/release/bundle/macos/Codebase Complexity Visualizer.app" /Applications/
+1. Open the app.
+2. Go to `Project Picker`.
+3. Select a repository root.
+4. Review settings if needed:
+   - languages
+   - exclude patterns
+   - risk weights
+   - optional 3D City View toggle
+5. Open `Analysis Runner`.
+6. Click `Run Analysis`.
+7. Inspect the dashboard tabs.
+
+CCV writes the analysis model to:
+
+```text
+<your-repo>/.ccv/analysis.json
 ```
 
-### 3) Launch without terminal
+That file is then reloaded on future opens of the same project.
 
-Open it from `/Applications` like any other app.
+## What CCV Stores
 
-Optional:
+CCV is local-first. It stores only local metadata and generated analysis output.
 
-- Keep in Dock: right-click Dock icon -> `Options` -> `Keep in Dock`
-- Auto-start on login: `System Settings -> General -> Login Items`
+Written data:
+
+- Repository analysis output: `<repo>/.ccv/analysis.json`
+- Local app database: `ccv.db`
+- Recent project paths
+- Saved settings
+- Per-project analysis record path
+
+CCV does not upload source code.
+CCV does not send telemetry.
+CCV does not require a cloud account.
+
+## Troubleshooting
+
+### The app opens, but analysis does not start
+
+Check that the packaged native analyzer exists:
+
+```bash
+ls -la "/Applications/Codebase Complexity Visualizer.app/Contents/MacOS/ccv-analyzer"
+```
+
+If it is missing, replace the installed app with a fresh build.
+
+### macOS blocks access to a repository
+
+Some folders, especially under `Documents`, `Desktop`, or external volumes, may require explicit permission.
+
+Open:
+
+- `System Settings`
+- `Privacy & Security`
+- `Full Disk Access`
+
+Then add `Codebase Complexity Visualizer.app`, enable access, and reopen the app.
+
+### Finder keeps opening an old app copy
+
+Remove the stale copy and reinstall:
+
+```bash
+osascript -e 'quit app "Codebase Complexity Visualizer"' || true
+rm -rf "/Applications/Codebase Complexity Visualizer.app"
+cp -R "apps/desktop/src-tauri/target/release/bundle/macos/Codebase Complexity Visualizer.app" /Applications/
+open "/Applications/Codebase Complexity Visualizer.app"
+```
+
+### Gatekeeper blocks a local unsigned build
+
+For local development builds only:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/Codebase Complexity Visualizer.app"
+```
 
 ## Development
 
-From repo root:
+Install dependencies:
 
 ```bash
 corepack pnpm install
-corepack pnpm typecheck
-corepack pnpm test
-corepack pnpm build
 ```
 
-Run desktop app in dev mode:
+Run checks:
+
+```bash
+corepack pnpm typecheck
+corepack pnpm test
+corepack pnpm test:native-analyzer
+```
+
+Run the desktop app in development mode:
 
 ```bash
 corepack pnpm --filter @ccv/desktop tauri:dev
 ```
 
-## CLI Usage
-
-Analyze a repository directly with the analyzer package:
+Build the native analyzer sidecar directly:
 
 ```bash
-corepack pnpm --filter @ccv/analyzer build
-node packages/analyzer/dist/cli.js analyze ./path-to-repo --out ./analysis.json
+./scripts/build-native-analyzer-sidecar.sh debug
+./scripts/build-native-analyzer-sidecar.sh release
 ```
 
-## Privacy
+Verify that the packaged app contains a working analyzer:
 
-- Analysis runs locally on your machine
-- No cloud upload
-- Only local files are written:
-  - analysis output (`analysis.json`)
-  - local app metadata/settings (`SQLite`)
+```bash
+corepack pnpm check:bundled-analyzer
+```
 
-See also:
+## Native Analyzer CLI
 
-- [macOS deployment notes](./docs/macos.md)
-- [privacy notes](./docs/privacy.md)
+The desktop app uses the native Rust analyzer in `crates/ccv-analyzer`.
 
-## Repo Structure
+Run it directly:
+
+```bash
+cargo run --manifest-path crates/ccv-analyzer/Cargo.toml -- \
+  analyze ./path-to-repo \
+  --out ./analysis.json \
+  --languages js,ts,java,py,php,css,html \
+  --exclude node_modules,.git,dist,build \
+  --weights loc=0.8,complexity=1.4,fanIn=1,fanOut=1,cycle=2.5
+```
+
+## Repository Layout
 
 ```text
-apps/desktop      # Tauri + React desktop app
-packages/analyzer # Analysis engine and CLI
-packages/model    # Shared types/defaults/schema
+apps/desktop        Tauri + React desktop app
+crates/ccv-analyzer Native Rust analyzer used by the packaged app
+packages/model      Shared schema, defaults, and validation
+packages/analyzer   Existing TypeScript analyzer implementation
+scripts/            Build and verification scripts
 ```
+
+## Additional Documentation
+
+- [macOS deployment and troubleshooting](./docs/macos.md)
+- [privacy details](./docs/privacy.md)
+- [contributing guide](./CONTRIBUTING.md)
